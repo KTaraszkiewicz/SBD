@@ -12,9 +12,11 @@ class Record:
         self.numbers = numbers
         self.sum = sum(numbers)
     
+    # Porównywanie rekordów na podstawie sumy
     def __lt__(self, other):
         return self.sum < other.sum
     
+    # Reprezentacja rekordu jako string
     def __str__(self):
         return f"{{{','.join(map(str, sorted(self.numbers)))}}}"
     
@@ -36,9 +38,9 @@ class DiskSimulator:
     """Symulacja operacji dyskowych z blokowaniem"""
     def __init__(self, filename: str, block_size: int, record_size: int):
         self.filename = filename
-        self.block_size = block_size  # liczba rekordów na stronę
+        self.block_size = block_size  # liczba rekordów na stronę (b)
         self.record_size = record_size  # rozmiar rekordu w bajtach
-        self.page_size = block_size * record_size  # rozmiar strony w bajtach
+        self.page_size = block_size * record_size  # rozmiar strony w bajtach (B)
         self.read_count = 0
         self.write_count = 0
         
@@ -102,9 +104,9 @@ class LargeBufferSort:
     """Sortowanie z użyciem wielkich buforów"""
     def __init__(self, input_file: str, n_buffers: int, block_size: int, record_size: int):
         self.input_file = input_file
-        self.n_buffers = n_buffers
-        self.block_size = block_size
-        self.record_size = record_size
+        self.n_buffers = n_buffers # liczba buforów (n)
+        self.block_size = block_size # liczba rekordów na stronę (b)
+        self.record_size = record_size # rozmiar rekordu w bajtach
         self.disk_sim = DiskSimulator(input_file, block_size, record_size)
         self.phase_count = 0
         self.temp_files = []
@@ -435,7 +437,6 @@ def calculate_theoretical_values(N: int, b: int, n: int) -> Tuple[int, int]:
         operations = 2 * N / b
     else:
         # Liczba faz scalania: log_{n}(r)
-        # POPRAWKA: używamy n (nie n-1) zgodnie ze slajdem 32
         phases = math.ceil(math.log(initial_runs, n))
         
         # Całkowity koszt: 2N/b (faza 1) + 2*phases*N/b (fazy scalania)
@@ -468,7 +469,7 @@ def run_experiment():
     print("="*60)
     
     # Parametry eksperymentu
-    test_sizes = [100, 500, 1000, 5000, 10000]
+    test_sizes = [100, 500, 1000, 5000, 10000, 20000, 50000, 100000]
     block_size = 10
     record_size = 128
     n_buffers_small = 5
@@ -638,9 +639,9 @@ def plot_results(results, n_small, n_large):
 def main():
     """Główna funkcja programu"""
     data_file = "data.dat"
-    block_size = 4  # liczba rekordów na stronę
+    block_size = 4  # liczba rekordów na stronę (b)
     record_size = 128  # rozmiar rekordu w bajtach
-    n_buffers = 3  # liczba buforów
+    n_buffers = 3  # liczba buforów (n)
     
     while True:
         print("\n" + "="*60)

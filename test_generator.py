@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Generator dużych plików testowych do sortowania
 Użycie: python test_generator.py
@@ -8,7 +7,7 @@ import random
 import argparse
 
 def generate_test_file(filename, n_records, min_numbers=1, max_numbers=15, 
-                       min_value=1, max_value=1000):
+                       min_value=1, max_value=100):
     """
     Generuje plik testowy z losowymi zbiorami liczb
     
