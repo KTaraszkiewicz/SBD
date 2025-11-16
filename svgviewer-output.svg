@@ -1,0 +1,181 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 2200">
+  <!-- Definicje stylów -->
+  <defs>
+    <style>
+      .title { font: bold 24px Arial; fill: #1a1a1a; }
+      .subtitle { font: bold 18px Arial; fill: #2c5aa0; }
+      .text { font: 14px Arial; fill: #1a1a1a; }
+      .small-text { font: 12px Arial; fill: #333; }
+      .start-end { fill: #4CAF50; stroke: #2d7a2d; stroke-width: 2; }
+      .process { fill: #2196F3; stroke: #1565C0; stroke-width: 2; }
+      .decision { fill: #FF9800; stroke: #E65100; stroke-width: 2; }
+      .io { fill: #9C27B0; stroke: #6A1B9A; stroke-width: 2; }
+      .arrow { stroke: #333; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+      .label-yes { font: bold 13px Arial; fill: #2d7a2d; }
+      .label-no { font: bold 13px Arial; fill: #c62828; }
+      .stage-box { fill: #f0f4ff; stroke: #2c5aa0; stroke-width: 3; stroke-dasharray: 5,5; }
+      .connector { fill: #4CAF50; stroke: #2d7a2d; stroke-width: 2; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#333" />
+    </marker>
+  </defs>
+  
+  <!-- Tytuł -->
+  <text x="600" y="65" text-anchor="middle" class="title">SORTOWANIE Z WIELOKIMI BUFORAMI</text>
+  <text x="600" y="60" text-anchor="middle" class="small-text"></text>
+  
+  <!-- Wejście z części 1 -->
+  <rect x="430" y="90" width="200" height="60" rx="10" class="connector"/>
+  <text x="530" y="115" text-anchor="middle" class="text" fill="white">Wejście z</text>
+  <text x="530" y="133" text-anchor="middle" class="text" fill="white">ETAPU 1</text>
+  
+  <!-- Strzałka -->
+  <path d="M 530 150 L 530 185" class="arrow"/>
+  
+  <!-- ========== ETAP 2 ========== -->
+  <rect x="80" y="185" width="900" height="1160" rx="15" class="stage-box" fill-opacity="0.3"/>
+  <text x="530" y="215" text-anchor="middle" class="subtitle">ETAP 2: Scalanie serii (n-way merge)</text>
+  
+  <!-- Inicjalizacja etapu 2 -->
+  <rect x="405" y="235" width="250" height="70" rx="10" class="process"/>
+  <text x="530" y="260" text-anchor="middle" class="text" fill="white">current_runs = lista serii</text>
+  <text x="530" y="278" text-anchor="middle" class="text" fill="white">phase_count = 0</text>
+  <text x="530" y="296" text-anchor="middle" class="small-text" fill="white">r = liczba początkowych serii</text>
+  
+  <!-- Strzałka -->
+  <path d="M 530 305 L 530 340" class="arrow"/>
+  
+  <!-- Decyzja: więcej niż 1 seria? -->
+  <polygon points="530,340 680,400 530,460 380,400" class="decision"/>
+  <text x="530" y="395" text-anchor="middle" class="text">Czy</text>
+  <text x="532" y="413" text-anchor="middle" class="text">len(runs) > 1?</text>
+  
+  <!-- NIE - koniec etapu 2 -->
+  <path d="M 680 400 L 1080 400 L 1080 700" class="arrow"/>
+  <text x="885" y="390" text-anchor="middle" class="label-no">NIE</text>
+  
+  <!-- TAK - nowa faza -->
+  <path d="M 530 460 L 530 495" class="arrow"/>
+  <text x="515" y="475" text-anchor="end" class="label-yes">TAK</text>
+  
+  <!-- phase_count++ -->
+  <rect x="430" y="495" width="200" height="50" rx="10" class="process"/>
+  <text x="530" y="525" text-anchor="middle" class="text" fill="white">phase_count++</text>
+  
+  <!-- Strzałka -->
+  <path d="M 530 545 L 530 580" class="arrow"/>
+  
+  <!-- Inicjalizacja heapa -->
+  <rect x="380" y="580" width="300" height="80" rx="10" class="process"/>
+  <text x="530" y="605" text-anchor="middle" class="text" fill="white">Inicjalizuj kolejkę</text>
+  <text x="530" y="623" text-anchor="middle" class="text" fill="white">priorytetową (heap)</text>
+  <text x="530" y="641" text-anchor="middle" class="small-text" fill="white">dla n-1 serii wejściowych</text>
+  <text x="530" y="655" text-anchor="middle" class="small-text" fill="white">read_count += (n-1)</text>
+  
+  <!-- Strzałka -->
+  <path d="M 530 660 L 530 695" class="arrow"/>
+  
+  <!-- Inicjalizacja bufora wyjściowego -->
+  <rect x="405" y="695" width="250" height="60" rx="10" class="process"/>
+  <text x="530" y="720" text-anchor="middle" class="text" fill="white">output_buffer = []</text>
+  <text x="530" y="738" text-anchor="middle" class="small-text" fill="white">(bufor wyjściowy - n-ty bufor)</text>
+  
+  <!-- Strzałka -->
+  <path d="M 530 755 L 530 790" class="arrow"/>
+  
+  <!-- Decyzja: heap niepusty? -->
+  <polygon points="530,790 650,840 530,890 410,840" class="decision"/>
+  <text x="530" y="845" text-anchor="middle" class="text">heap niepusty?</text>
+  
+  <!-- NIE - zapisz ostatni bufor -->
+  <path d="M 650 840 L 720 840" class="arrow"/>
+  <text x="680" y="830" text-anchor="middle" class="label-no">NIE</text>
+  
+  <rect x="720" y="810" width="200" height="60" rx="10" class="io"/>
+  <text x="820" y="835" text-anchor="middle" class="text" fill="white">Zapisz ostatni bufor</text>
+  <text x="820" y="853" text-anchor="middle" class="small-text" fill="white">write_count++</text>
+  
+  <!-- Powrót do sprawdzenia liczby serii -->
+  <path d="M 820 810 L 820 450 L 680 450 L 680 400" class="arrow"/>
+  
+  <!-- TAK - scalanie -->
+  <path d="M 530 890 L 530 925" class="arrow"/>
+  <text x="515" y="903" text-anchor="end" class="label-yes">TAK</text>
+  
+  <!-- Pobierz minimum z heapa -->
+  <rect x="380" y="925" width="300" height="60" rx="10" class="process"/>
+  <text x="530" y="950" text-anchor="middle" class="text" fill="white">record = heap.pop_min()</text>
+  <text x="530" y="968" text-anchor="middle" class="small-text" fill="white">O(log n) operacja</text>
+  
+  <!-- Strzałka -->
+  <path d="M 530 985 L 530 1020" class="arrow"/>
+  
+  <!-- Dodaj do bufora wyjściowego -->
+  <rect x="405" y="1020" width="250" height="50" rx="10" class="process"/>
+  <text x="530" y="1050" text-anchor="middle" class="text" fill="white">output_buffer.append(record)</text>
+  
+  <!-- Strzałka -->
+  <path d="M 530 1070 L 530 1105" class="arrow"/>
+  
+  <!-- Decyzja: bufor pełny? -->
+  <polygon points="530,1105 650,1155 530,1205 410,1155" class="decision"/>
+  <text x="530" y="1160" text-anchor="middle" class="text">len(buffer) ≥ b?</text>
+  
+  <!-- TAK - zapisz bufor -->
+  <path d="M 650 1155 L 730 1155" class="arrow"/>
+  <text x="685" y="1145" text-anchor="middle" class="label-yes">TAK</text>
+  
+  <rect x="730" y="1125" width="180" height="60" rx="10" class="io"/>
+  <text x="820" y="1150" text-anchor="middle" class="text" fill="white">Zapisz bufor</text>
+  <text x="820" y="1168" text-anchor="middle" class="small-text" fill="white">write_count++</text>
+  
+  <path d="M 820 1125 L 820 1080 L 530 1080 L 530 1105" class="arrow"/>
+  
+  <!-- NIE - wczytaj następny rekord -->
+  <path d="M 530 1205 L 530 1240" class="arrow"/>
+  <text x="515" y="1220" text-anchor="end" class="label-no">NIE</text>
+  
+  <!-- Wczytaj następny rekord z tej samej serii -->
+  <rect x="355" y="1240" width="350" height="80" rx="10" class="io"/>
+  <text x="530" y="1265" text-anchor="middle" class="text" fill="white">Wczytaj następny rekord</text>
+  <text x="530" y="1283" text-anchor="middle" class="text" fill="white">z tej samej serii</text>
+  <text x="530" y="1301" text-anchor="middle" class="small-text" fill="white">Jeśli bufor pusty: read_count++</text>
+  <text x="530" y="1315" text-anchor="middle" class="small-text" fill="white">heap.push(new_record)</text>
+  
+  <!-- Powrót do sprawdzenia heapa -->
+  <path d="M 355 1280 L 180 1280 L 180 840 L 410 840" class="arrow"/>
+  
+  <!-- ========== KONIEC ETAPU 2 ========== -->
+  
+  <!-- Kopiuj wynik -->
+  <rect x="990" y="700" width="180" height="70" rx="10" class="process"/>
+  <text x="1080" y="725" text-anchor="middle" class="text" fill="white">Kopiuj wynik do</text>
+  <text x="1080" y="745" text-anchor="middle" class="text" fill="white">pliku wejściowego</text>
+  <text x="1080" y="760" text-anchor="middle" class="small-text" fill="white">Usuń pliki tymczasowe</text>
+  
+  <!-- Strzałka -->
+  <path d="M 1080 770 L 1080 805" class="arrow"/>
+  
+  <!-- Wyświetl statystyki -->
+  <rect x="990" y="805" width="180" height="100" rx="10" class="io"/>
+  <text x="1080" y="825" text-anchor="middle" class="text" fill="white">Wyświetl wyniki:</text>
+  <text x="1080" y="840" text-anchor="middle" class="small-text" fill="white">Liczba faz: phase_count</text>
+  <text x="1080" y="855" text-anchor="middle" class="small-text" fill="white">Odczyty: read_count</text>
+  <text x="1080" y="870" text-anchor="middle" class="small-text" fill="white">Zapisy: write_count</text>
+  <text x="1080" y="885" text-anchor="middle" class="small-text" fill="white">Suma: read_count + write_count</text>
+  
+  <!-- Strzałka -->
+  <path d="M 1080 905 L 1080 940" class="arrow"/>
+  
+  <!-- KONIEC -->
+  <ellipse cx="1080" cy="975" rx="80" ry="35" class="start-end"/>
+  <text x="1080" y="980" text-anchor="middle" class="text" fill="white">KONIEC</text>
+  
+  <!-- Ramka z legendą -->
+  <rect x="50" y="1365" width="1100" height="95" rx="10" fill="#f9f9f9" stroke="#666" stroke-width="1"/>
+  <text x="600" y="1390" text-anchor="middle" class="text" font-weight="bold">ZŁOŻONOŚĆ ETAPU 2:</text>
+  <text x="600" y="1410" text-anchor="middle" class="small-text">Liczba faz scalania: ⌈log(n-1) r⌉, gdzie r = liczba serii początkowych</text>
+  <text x="600" y="1430" text-anchor="middle" class="small-text">W każdej fazie: scalamy (n-1) serii do jednej, wykorzystując n-ty bufor jako wyjściowy</text>
+  <text x="600" y="1450" text-anchor="middle" class="small-text" font-style="italic">Heap (kolejka priorytetowa) zapewnia efektywne znajdowanie minimum w O(log n)</text>
+</svg>
