@@ -785,8 +785,8 @@ def main():
             
         elif choice == '9':
             try:
-                block_size = int(input(f"Nowy blocking factor (obecnie {block_size}): "))
-                n_buffers = int(input(f"Nowa liczba buforów (obecnie {n_buffers}): "))
+                block_size = int(input(f"Nowy blocking factor (obecnie b={block_size}): "))
+                n_buffers = int(input(f"Nowa liczba buforów (obecnie n={n_buffers}): "))
                 print(f"Parametry zmienione: b={block_size}, n={n_buffers}")
             except ValueError:
                 print("Błędne wartości!")
