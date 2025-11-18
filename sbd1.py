@@ -28,7 +28,7 @@ class Record:
     
     def to_string(self, max_length: int) -> str:
         """Konwertuje rekord na string o stałej długości z paddingiem"""
-        # ljust dodaje znaki '\0' aż do długości max_length — przydatne do zapisu stałych pól binarnych.
+        # ljust dodaje znaki '\0' aż do długości max_length – przydatne do zapisu stałych pól binarnych.
         s = str(self)
         return s.ljust(max_length, '\0')
     
@@ -53,9 +53,8 @@ class DiskSimulator:
         self.read_count = 0
         self.write_count = 0
         
-    def read_page(self, page_num: int) -> List[Record]:
+    def read_page(self, page_num: int,count_operation: bool = True) -> List[Record]:
         """Odczytuje stronę z dysku"""
-        self.read_count += 1
         records = []
         
         try:
@@ -79,7 +78,11 @@ class DiskSimulator:
         except FileNotFoundError:
             # Brak pliku oznacza brak stron do odczytu.
             pass
-        
+
+        # Licznik zwiększamy TYLKO gdy faktycznie odczytano dane i count_operation=True
+        if count_operation and records:
+            self.read_count += 1
+
         return records
     
     def write_page(self, page_num: int, records: List[Record]):
@@ -119,6 +122,13 @@ class DiskSimulator:
         self.read_count = 0
         self.write_count = 0
 
+class RunInfo:
+    """Informacje o położeniu serii w pliku"""
+    def __init__(self, start_page: int, end_page: int):
+        self.start_page = start_page
+        self.end_page = end_page
+        self.length = end_page - start_page
+
 class LargeBufferSort:
     """Sortowanie z użyciem wielkich buforów"""
     def __init__(self, input_file: str, n_buffers: int, block_size: int, record_size: int):
@@ -128,7 +138,6 @@ class LargeBufferSort:
         self.record_size = record_size # rozmiar rekordu w bajtach
         self.disk_sim = DiskSimulator(input_file, block_size, record_size)
         self.phase_count = 0
-        self.temp_files = []
         
     def sort(self, show_phases: bool = False):
         """
@@ -136,7 +145,7 @@ class LargeBufferSort:
 
         Etap 1 (tworzenie serii)
         1. Wczytaj pierwsze n*b rekordów do buforów i posortuj je
-        2. Zapisz serię na dysku
+        2. Zapisz serię na dysku (nadpisując plik wejściowy)
         3. Powtarzaj, aż do końca pliku
 
         Etap 2 (scalanie)
@@ -159,29 +168,22 @@ class LargeBufferSort:
         
         # Stage 1: Creating runs
         print("\nEtap 1: Tworzenie posortowanych serii...")
-        run_files = self._create_runs()
-        print(f"Utworzono {len(run_files)} serii początkowych")
+        runs = self._create_runs()
+        print(f"Utworzono {len(runs)} serii początkowych")
         
         if show_phases:
             # Zapisz i wyświetl serie początkowe
             phase_fh.write("Serie początkowe:\n")
-            for i, run_file in enumerate(run_files):
-                print(f"Seria {i+1}:")
-                phase_fh.write(f"Seria {i+1}:\n")
-                self._display_file(run_file, phase_fh)
+            for i, run in enumerate(runs):
+                print(f"Seria {i+1} (strony {run.start_page}-{run.end_page}):")
+                phase_fh.write(f"Seria {i+1} (strony {run.start_page}-{run.end_page}):\n")
+                self._display_run(run, phase_fh)
                 phase_fh.write("\n")
         
         # Stage 2: Merging
         print("\nEtap 2: Scalanie serii...")
         self.phase_count = 0
-        merged_file = self._merge_runs(run_files, show_phases, phase_fh)
-        
-        # Skopiuj wynik do pliku wejściowego
-        if merged_file != self.input_file:
-            os.replace(merged_file, self.input_file)
-        
-        # Usuń pliki tymczasowe
-        self._cleanup_temp_files()
+        self._merge_runs(runs, show_phases, phase_fh)
         
         # Zamknij plik logu jeśli był otwarty
         if phase_fh:
@@ -193,55 +195,67 @@ class LargeBufferSort:
         print(f"Liczba zapisów stron: {self.disk_sim.write_count}")
         print(f"Łączna liczba operacji dyskowych: {self.disk_sim.read_count + self.disk_sim.write_count}")
     
-    def _create_runs(self) -> List[str]:
+    def _create_runs(self) -> List[RunInfo]:
         """
-        Etap 1: Tworzy posortowane serie
-        1. Wczytaj pierwsze n buforów stron (n*b rekordów) i posortuj je
-        2. Zapisz serię na dysku
-        3. Powtarzaj aż do końca pliku
+        Etap 1: Tworzy posortowane serie z natychmiastowym nadpisywaniem
+        Po każdym wczytaniu jednej serii (n*b rekordów), sortuje i OD RAZU nadpisuje w pliku
         """
-        run_files = []
-        page_num = 0
+        runs = []
+        input_page = 0
+        total_pages = self.disk_sim.get_file_size_in_pages()
         
-        while True:
-            # Krok 1: Wczytaj kolejne n stron (każda strona zawiera b rekordów)
+        while input_page < total_pages:
+            # Wczytaj JEDNĄ serię (n stron = n*b rekordów)
             records = []
+            start_page = input_page
+            
             for i in range(self.n_buffers):
-                page_records = self.disk_sim.read_page(page_num)
+                if input_page >= total_pages:
+                    break
+                page_records = self.disk_sim.read_page(input_page)
                 if not page_records:
                     break
                 records.extend(page_records)
-                page_num += 1
+                input_page += 1
             
             if not records:
                 break
             
-            # Sortowanie rekordów w pamięci; Python używa Timsort (stabilny, wydajny)
+            # Sortuj rekordy w pamięci
             records.sort()
             
-            # Krok 2: Zapisz serię na dysku
-            run_file = f"{self.input_file}.run{len(run_files)}"
-            run_files.append(run_file)
-            self.temp_files.append(run_file)
+            # NATYCHMIAST otwórz plik i nadpisz tę serię w miejscu nieposortowanej
+            output_page = start_page
+            with open(self.input_file, 'r+b') as f:
+                for i in range(0, len(records), self.block_size):
+                    page_records = records[i:i + self.block_size]
+                    
+                    # Przygotuj dane do zapisu
+                    data = b''
+                    for j in range(self.block_size):
+                        if j < len(page_records):
+                            record_str = page_records[j].to_string(self.record_size)
+                        else:
+                            record_str = '\0' * self.record_size
+                        data += record_str.encode('utf-8')
+                    
+                    # Nadpisz w pliku
+                    f.seek(output_page * self.disk_sim.page_size)
+                    f.write(data)
+                    self.disk_sim.write_count += 1
+                    output_page += 1
+            # Plik zamknięty automatycznie po wyjściu z bloku with
             
-            run_disk = DiskSimulator(run_file, self.block_size, self.record_size)
-            for i in range(0, len(records), self.block_size):
-                page_records = records[i:i + self.block_size]
-                run_disk.write_page(i // self.block_size, page_records)
-            
-            # Dodaj operacje do licznika głównego
-            self.disk_sim.write_count += run_disk.write_count
+            runs.append(RunInfo(start_page, output_page))
         
-        return run_files
+        return runs
     
-    def _merge_runs(self, run_files: List[str], show_phases: bool, fh: Optional[IO] = None) -> str:
+    def _merge_runs(self, runs: List[RunInfo], show_phases: bool, fh: Optional[IO] = None):
         """
-        Etap 2: Scala serie używając n-1 buforów wejściowych
-        4. Scal pierwsze n-1 serii używając n-tego bufora jako bufora wyjściowego
-        5. Powtarzaj dla kolejnych grup serii
-        6. Powtarzaj aż pozostanie jedna seria
+        Etap 2: Scala serie z natychmiastowym nadpisywaniem
+        Po scaleniu grupy serii, natychmiast nadpisuje wynik od początku pierwszej serii
         """
-        current_runs = run_files
+        current_runs = runs
         
         while len(current_runs) > 1:
             self.phase_count += 1
@@ -252,105 +266,125 @@ class LargeBufferSort:
             
             next_runs = []
             
-            # Krok 4: Scal pierwsze n-1 serii
+            # Scal grupy po (n-1) serii
             for i in range(0, len(current_runs), self.n_buffers - 1):
                 runs_to_merge = current_runs[i:i + self.n_buffers - 1]
-                output_file = f"{self.input_file}.merged{self.phase_count}_{len(next_runs)}"
-                next_runs.append(output_file)
-                self.temp_files.append(output_file)
                 
-                self._merge_multiple_runs(runs_to_merge, output_file)
-            
-            # Usuń stare serie
-            for run_file in current_runs:
-                if os.path.exists(run_file):
-                    os.remove(run_file)
-                if run_file in self.temp_files:
-                    self.temp_files.remove(run_file)
+                # Wyznacz miejsce zapisu - od początku pierwszej serii w grupie
+                output_start_page = runs_to_merge[0].start_page
+                
+                # Scal i natychmiast zapisz
+                output_end_page = self._merge_multiple_runs(runs_to_merge, output_start_page)
+                next_runs.append(RunInfo(output_start_page, output_end_page))
             
             current_runs = next_runs
             
             if show_phases and fh:
                 fh.write(f"\nPo fazie {self.phase_count}:\n")
-                for i, run_file in enumerate(current_runs):
-                    fh.write(f"Seria {i+1}:\n")
-                    self._display_file(run_file, fh)
+                for i, run in enumerate(current_runs):
+                    fh.write(f"Seria {i+1} (strony {run.start_page}-{run.end_page}):\n")
+                    self._display_run(run, fh)
                     fh.write("\n")
             
             if show_phases:
                 print(f"\nPo fazie {self.phase_count}:")
-                for i, run_file in enumerate(current_runs):
-                    print(f"Seria {i+1}:")
-                    self._display_file(run_file, fh if show_phases else None)
-        
-        return current_runs[0] if current_runs else self.input_file
+                for i, run in enumerate(current_runs):
+                    print(f"Seria {i+1} (strony {run.start_page}-{run.end_page}):")
+                    self._display_run(run, fh if show_phases else None)
     
-    def _merge_multiple_runs(self, run_files: List[str], output_file: str):
+    def _merge_multiple_runs(self, runs: List[RunInfo], output_start_page: int) -> int:
         """
-        Scala wiele serii używając kolejki priorytetowej
-        Używa n-1 buforów wejściowych i 1 bufora wyjściowego
+        Scala wiele serii i NATYCHMIAST zapisuje w miejsce scalanych serii
+        Otwiera plik raz, zapisuje wszystkie strony, zamyka
         """
-        # Inicjalizacja buforów wejściowych (n-1 buforów)
+        # Inicjalizacja buforów wejściowych
         input_buffers = []
-        disk_sims = []
         page_indices = []
         
-        for run_file in run_files:
-            disk_sim = DiskSimulator(run_file, self.block_size, self.record_size)
-            disk_sims.append(disk_sim)
-            page_indices.append(0)
-            
-            # Wczytaj pierwszą stronę z każdej serii
-            page_records = disk_sim.read_page(0)
+        for run in runs:
+            page_indices.append(run.start_page)
+            page_records = self.disk_sim.read_page(run.start_page)
             input_buffers.append(page_records)
-            self.disk_sim.read_count += 1
         
-        # Bufor wyjściowy (n-ty bufor)
+        # Bufor wyjściowy
         output_buffer = []
-        output_disk = DiskSimulator(output_file, self.block_size, self.record_size)
-        output_page = 0
+        output_page = output_start_page
         
-        # Kolejka priorytetowa: (rekord, indeks_bufora, indeks_w_buforze)
-        # Dzięki temu zawsze pobieramy najmniejszy rekord spośród pierwszych elementów buforów.
+        # Kolejka priorytetowa
         heap = []
         for i, buffer in enumerate(input_buffers):
             if buffer:
-                # Push tuple (rekord, buffer_index, position_in_buffer)
                 heapq.heappush(heap, (buffer[0], i, 0))
         
-        # Scalanie: za każdym razem wyciągamy najmniejszy rekord z kopca.
-        while heap:
-            record, buffer_idx, pos_in_buffer = heapq.heappop(heap)
+        # Otwórz plik JEDEN RAZ do zapisu scalonych danych
+        with open(self.input_file, 'r+b') as f:
+            # Scalanie
+            while heap:
+                record, buffer_idx, pos_in_buffer = heapq.heappop(heap)
+                
+                output_buffer.append(record)
+                
+                # Gdy bufor wyjściowy jest pełny, zapisz stronę
+                if len(output_buffer) >= self.block_size:
+                    # Przygotuj dane
+                    data = b''
+                    for j in range(self.block_size):
+                        if j < len(output_buffer):
+                            record_str = output_buffer[j].to_string(self.record_size)
+                        else:
+                            record_str = '\0' * self.record_size
+                        data += record_str.encode('utf-8')
+                    
+                    # Zapisz do pliku
+                    f.seek(output_page * self.disk_sim.page_size)
+                    f.write(data)
+                    self.disk_sim.write_count += 1
+                    output_page += 1
+                    output_buffer = []
+                
+                # Weź następny rekord
+                next_pos = pos_in_buffer + 1
+                if next_pos < len(input_buffers[buffer_idx]):
+                    heapq.heappush(heap, (input_buffers[buffer_idx][next_pos], buffer_idx, next_pos))
+                else:
+                    page_indices[buffer_idx] += 1
+                    if page_indices[buffer_idx] < runs[buffer_idx].end_page:
+                        next_page = self.disk_sim.read_page(page_indices[buffer_idx])
+                        if next_page:
+                            input_buffers[buffer_idx] = next_page
+                            heapq.heappush(heap, (next_page[0], buffer_idx, 0))
             
-            # Dodaj rekord do bufora wyjściowego
-            output_buffer.append(record)
-            
-            # Jeśli bufor wyjściowy jest pełny, zapisz go jako stronę
-            if len(output_buffer) >= self.block_size:
-                output_disk.write_page(output_page, output_buffer)
+            # Zapisz pozostałe rekordy w buforze wyjściowym
+            if output_buffer:
+                data = b''
+                for j in range(self.block_size):
+                    if j < len(output_buffer):
+                        record_str = output_buffer[j].to_string(self.record_size)
+                    else:
+                        record_str = '\0' * self.record_size
+                    data += record_str.encode('utf-8')
+                
+                f.seek(output_page * self.disk_sim.page_size)
+                f.write(data)
                 self.disk_sim.write_count += 1
                 output_page += 1
-                output_buffer = []
-            
-            # Weź następny rekord z tego samego bufora albo wczytaj kolejną stronę
-            next_pos = pos_in_buffer + 1
-            if next_pos < len(input_buffers[buffer_idx]):
-                # Następny rekord jest już załadowany w tym buforze
-                heapq.heappush(heap, (input_buffers[buffer_idx][next_pos], buffer_idx, next_pos))
-            else:
-                # Jeśli bufor się wyczerpał, wczytaj kolejną stronę z pliku serii
-                page_indices[buffer_idx] += 1
-                next_page = disk_sims[buffer_idx].read_page(page_indices[buffer_idx])
-                if next_page:
-                    # Zastąp bufor nową stroną i wrzuć pierwszy element do kopca
-                    input_buffers[buffer_idx] = next_page
-                    self.disk_sim.read_count += 1
-                    heapq.heappush(heap, (next_page[0], buffer_idx, 0))
+        # Plik zamknięty automatycznie
         
-        # Zapisz pozostałe rekordy w buforze wyjściowym
-        if output_buffer:
-            output_disk.write_page(output_page, output_buffer)
-            self.disk_sim.write_count += 1
+        return output_page
+    
+    def _display_run(self, run: RunInfo, fh: Optional[IO] = None):
+        """Wyświetla zawartość serii; dodatkowo zapisuje do fh gdy podany"""
+        all_records = []
+        
+        for page_num in range(run.start_page, run.end_page):
+            records = self.disk_sim.read_page(page_num, count_operation=False)
+            all_records.extend(records)
+        
+        for i, record in enumerate(all_records, 1):
+            line = f"  {i}. {record} (suma={record.sum})"
+            print(line)
+            if fh:
+                fh.write(line + "\n")
     
     def _display_file(self, filename: str, fh: Optional[IO] = None):
         """Wyświetla zawartość pliku; dodatkowo zapisuje do fh gdy podany"""
@@ -366,7 +400,7 @@ class LargeBufferSort:
         all_records = []
         
         while True:
-            records = disk_sim.read_page(page_num)
+            records = disk_sim.read_page(page_num, count_operation=False)
             if not records:
                 break
             all_records.extend(records)
@@ -377,13 +411,6 @@ class LargeBufferSort:
             print(line)
             if fh:
                 fh.write(line + "\n")
-    
-    def _cleanup_temp_files(self):
-        """Usuwa pliki tymczasowe"""
-        for temp_file in self.temp_files:
-            if os.path.exists(temp_file):
-                os.remove(temp_file)
-        self.temp_files = []
 
 def generate_random_records(n: int, max_numbers: int = 15) -> List[Record]:
     """Generuje losowe rekordy"""
@@ -453,7 +480,7 @@ def display_file_records(filename: str, block_size: int, record_size: int):
     print(f"{'='*50}")
     
     while True:
-        records = disk_sim.read_page(page_num)
+        records = disk_sim.read_page(page_num, count_operation=False)
         if not records:
             break
         
@@ -472,7 +499,7 @@ def export_sorted_to_txt(dat_file: str, txt_file: str, block_size: int, record_s
     all_records = []
     
     while True:
-        records = disk_sim.read_page(page_num)
+        records = disk_sim.read_page(page_num, count_operation=False)
         if not records:
             break
         all_records.extend(records)
@@ -812,11 +839,11 @@ def main():
                 # Opcjonalnie konwertuj do .dat
                 convert = input(f"\nKonwertować do formatu .dat? (t/n): ")
                 if convert.lower() == 't':
-                    print(f"Wczytuję {filename}...")
+                    print(f"Wczytuje {filename}...")
                     records = read_records_from_file(filename)
                     dat_filename = filename.replace('.txt', '.dat')
                     save_records_to_disk(records, dat_filename, block_size, record_size)
-                    print(f"Plik binarny zapisany jako: {dat_filename}")
+                    print(f"Plik binarny zapisany1 jako: {dat_filename}")
                     
             except ValueError:
                 print("Błędna wartość!")
