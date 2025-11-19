@@ -28,14 +28,14 @@ class Record:
     
     def to_string(self, max_length: int) -> str:
         """Konwertuje rekord na string o stałej długości z paddingiem"""
-        # ljust dodaje znaki '\0' aż do długości max_length – przydatne do zapisu stałych pól binarnych.
+        # ljust dodaje znaki '\0' aż do długości max_length - stałe pola binarne
         s = str(self)
         return s.ljust(max_length, '\0')
     
     @staticmethod
     def from_string(s: str) -> 'Record':
         """Tworzy rekord ze stringa"""
-        # Usuń padding '\0' z końca; pusty lub '{}' oznacza brak rekordu.
+        # Usunięcie paddingu '\0' z końca; pusty lub '{}' oznacza brak rekordu.
         s = s.rstrip('\0')
         if not s or s == '{}':
             return None
@@ -101,7 +101,7 @@ class DiskSimulator:
             # Kodujemy cały rekord (wraz z paddingiem) do bajtów
             data += record_str.encode('utf-8')
         
-        # Upewnij się, że katalog istnieje; tryb pliku zależy od istnienia pliku (append/overwrite)
+        # Sprawdzenie istnienia pliku, tryb pliku zależy od istnienia pliku (append/overwrite)
         os.makedirs(os.path.dirname(self.filename) if os.path.dirname(self.filename) else '.', exist_ok=True)
         mode = 'r+b' if os.path.exists(self.filename) else 'wb'
         
@@ -166,7 +166,7 @@ class LargeBufferSort:
             phase_fh.write("="*60 + "\n\n")
             print(f"Fazy będą zapisywane do: {logname}")
         
-        # Stage 1: Creating runs
+        # Etap 1: Tworzenie serii
         print("\nEtap 1: Tworzenie posortowanych serii...")
         runs = self._create_runs()
         print(f"Utworzono {len(runs)} serii początkowych")
@@ -180,7 +180,7 @@ class LargeBufferSort:
                 self._display_run(run, phase_fh)
                 phase_fh.write("\n")
         
-        # Stage 2: Merging
+        # Etap 2: Scalanie serii
         print("\nEtap 2: Scalanie serii...")
         self.phase_count = 0
         self._merge_runs(runs, show_phases, phase_fh)
