@@ -746,21 +746,32 @@ def main():
         choice = input("Wybór: ").strip()
         
         if choice == '1':
-            n = int(input("Liczba rekordów do wygenerowania: "))
-            records = generate_random_records(n)
-            save_records_to_disk(records, data_file, block_size, record_size)
-            
-            # Automatycznie zapisz też do TXT
-            txt_file = data_file.replace('.dat', '_input.txt')
-            save_records_to_txt(records, txt_file)
-            
-            print(f"Wygenerowano i zapisano {n} rekordów")
-            print(f"  - Plik binarny: {data_file}")
-            print(f"  - Plik tekstowy: {txt_file}")
-            
+            try:
+                n = int(input("Liczba rekordów do wygenerowania: "))
+
+                # Usuń istniejący plik data.dat przed wygenerowaniem nowego
+                if os.path.exists(data_file):
+                    os.remove(data_file)
+
+                records = generate_random_records(n)
+                save_records_to_disk(records, data_file, block_size, record_size)
+                
+                # Automatycznie zapisz też do TXT
+                txt_file = data_file.replace('.dat', '_input.txt')
+                save_records_to_txt(records, txt_file)
+                
+                print(f"Wygenerowano i zapisano {n} rekordów")
+                print(f"  - Plik binarny: {data_file}")
+                print(f"  - Plik tekstowy: {txt_file}")
+            except ValueError:
+                print("Błędna wartość! Nie wygenerowano rekordów.")
+        
         elif choice == '2':
             records = read_records_from_keyboard()
             if records:
+                # Usuń istniejący plik data.dat przed wygenerowaniem nowego
+                if os.path.exists(data_file):
+                    os.remove(data_file)
                 save_records_to_disk(records, data_file, block_size, record_size)
                 
                 # Zapisz też do TXT
