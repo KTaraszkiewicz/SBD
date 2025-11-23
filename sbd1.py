@@ -316,7 +316,7 @@ class LargeBufferSort:
             if buffer:
                 heapq.heappush(heap, (buffer[0], i, 0))
         
-        # Otwórz plik JEDEN RAZ do zapisu scalonych danych
+        # Otwórz plik do zapisu scalonych danych
         with open(self.input_file, 'r+b') as f:
             # Scalanie
             while heap:
@@ -846,15 +846,6 @@ def main():
                     filename = f"test_{n_records}.txt"
                 
                 generate_large_test_file(filename, n_records)
-                
-                # Opcjonalnie konwertuj do .dat
-                convert = input(f"\nKonwertować do formatu .dat? (t/n): ")
-                if convert.lower() == 't':
-                    print(f"Wczytuje {filename}...")
-                    records = read_records_from_file(filename)
-                    dat_filename = filename.replace('.txt', '.dat')
-                    save_records_to_disk(records, dat_filename, block_size, record_size)
-                    print(f"Plik binarny zapisany1 jako: {dat_filename}")
                     
             except ValueError:
                 print("Błędna wartość!")
